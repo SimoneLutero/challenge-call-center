@@ -26,6 +26,8 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
+% MODULE is name of this module (node_boot in this case)
+
 -define(SERVER, ?MODULE).
 -define(CB_MODULE, ?MODULE).
 
@@ -35,6 +37,8 @@
 
 start_link() ->
     {ok, _} = gen_server:start_link({local, ?SERVER}, ?CB_MODULE, [], []).
+
+% If name registration succeeds, the new gen_server process calls the callback function node_boot:init([])
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -48,8 +52,12 @@ init(_Args) ->
         status = fully_booted
     }}.
 
+% Synchronous requests
+
 handle_call(_Request, _From, State) ->
     {noreply, State}.
+
+% Asynchronous requests
 
 handle_cast(_Request, State) ->
     {noreply, State}.

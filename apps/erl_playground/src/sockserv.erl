@@ -53,6 +53,16 @@ start() ->
         {backlog, 100}
     ],
 
+    % Start a tcp_listener
+    % sockserv_tcp is the name
+    % ranch_tcp is the transport handler
+    % options[
+    %   {port, Port} is the port where to listen
+    %   {num_acceptors, 100} is the number of acceptor processes. Their role is to accept connections and spawn a connection process for every new connection.
+    %   {backlog, 100} is the max number of connections in queue. They go in queue after max_connections connections (default 1024).
+    % ]
+    % sockserv is the protocol handler.
+
     {ok, _} = ranch:start_listener(
         sockserv_tcp,
         ranch_tcp,

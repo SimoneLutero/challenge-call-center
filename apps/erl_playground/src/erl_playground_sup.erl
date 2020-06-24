@@ -30,6 +30,30 @@ init([]) ->
     MaxR = 1000, % how many times
     MaxT = 10, % in how many seconds
 
+    % SupFlags = #{strategy => one_for_all,
+    %              intensity => MaxR,
+    %              period => MaxT},
+
+    % ChildSpecs = 
+    %   [# {id => ranch_sup,
+    %       start => {I, start_link, []},
+    %       restart => permanent,
+    %       shutdown => 5000,
+    %       type => supervisor,
+    %       modules => [ranch_sup]},
+    %   # {id => node_boot,
+    %       start => {I, start_link, []},
+    %       restart => transient,
+    %       shutdown => 5000,
+    %       type => worker,
+    %       modules => [node_boot]}
+    %   ].
+
+    % {ok, {SupFlags, ChildSpecs}}.
+
+    % This supervisor is going to start ranch_sup to make possible to use ranch listeners
+    % then it starts node_boot which starts server and/or client.
+
     {ok, { {one_for_all, MaxR, MaxT}, [
     	?CHILD(ranch_sup, supervisor),
         ?CHILD(node_boot, worker, transient)
