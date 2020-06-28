@@ -9,7 +9,8 @@
 
 -export([start_link/0]). -ignore_xref([{start_link, 4}]).
 -export([connect/0, disconnect/0]).
--export([send_create_session/0]).
+-export([send_create_session/0, send_create_session/1]).
+-export([send_message/2]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -58,6 +59,19 @@ send_create_session() ->
     },
     gen_server:cast(whereis(?SERVER), {create_session, CreateSession}).
 
+send_create_session(Username) ->
+    CreateSession = #create_session {
+        username = Username
+    },
+    gen_server:cast(whereis(?SERVER), {create_session, CreateSession}).
+
+send_message(Username, Message) ->
+    ClientMessage = #client_message {
+        username = Username,
+        message_body = Message
+    },
+    gen_server:cast(whereis(?SERVER), {client_message, ClientMessage}).
+
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
@@ -79,6 +93,19 @@ handle_cast({create_session, CreateSession}, #state{socket = Socket} = State)
     gen_tcp:send(Socket, Data),
 
     {noreply, State};
+
+handle_cast({client_message, ClientMessage}, #state{socket = Socket} = State)
+    when Socket =/= undefined ->
+    Req = #req {
+        type = client_message,
+        client_message_data = ClientMessage
+    },
+    Data = utils:add_envelope(Req),
+
+    gen_tcp:send(Socket, Data),
+
+    {noreply, State};
+
 handle_cast(Message, State) ->
     _ = lager:warning("No handle_cast for ~p", [Message]),
     {noreply, State}.

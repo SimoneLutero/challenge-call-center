@@ -10,6 +10,7 @@
 
 -export([start_link/4]). -ignore_xref([{start_link, 4}]).
 -export([start/0]).
+-export([handle_client/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -153,18 +154,131 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
     when Type =:= create_session ->
     #req{
         create_session_data = #create_session {
-            username = UserName
+            username = UsernameString
         }
     } = Req,
-    _ = lager:info("create_session received from ~p", [UserName]),
+    _ = lager:info("create_session received from ~p", [UsernameString]),
+
+    
+
+    UsernameAtom = binary_to_atom(UsernameString, utf8),
+
+    %spawn a process with client name
+    case whereis(UsernameAtom) of 
+        undefined ->
+            register(UsernameAtom, spawn(?MODULE, handle_client, [State])),
+            Feedback = "session created";
+        _else ->
+            Feedback = "session already exists"
+    end,
 
     Response = #req{
         type = server_message,
         server_message_data = #server_message {
-            message = <<"OK">>
+            message = Feedback
         }
     },
     Data = utils:add_envelope(Response),
     Transport:send(Socket,Data),
 
+    UsernameAtom ! {normal},
+
+    State;
+
+process_packet(#req{ type = Type } = Req, State, _Now)
+    when Type =:= client_message ->
+    #req{
+        client_message_data = #client_message {
+            username = UsernameBinary,
+            message_body = MessageBody
+        }
+    } = Req,
+    _ = lager:info("client_message received from ~p", [UsernameBinary]),
+
+    UsernameAtom = binary_to_atom(UsernameBinary, utf8), 
+    
+    case whereis(UsernameAtom) of 
+        undefined ->
+            _ = lager:info("session not found, creating a session"),
+            process_packet(#req{ type = create_session, create_session_data = UsernameBinary}, State, _Now);
+        _else ->
+            ok
+    end,
+
+    %send data to process with client name
+    UsernameAtom ! {MessageBody},
+
     State.
+
+
+handle_client(State = {ok, #state{socket = Socket, transport = Transport}}) ->
+    receive
+        {<<"1">>} ->
+            Response = #req{
+                type = server_message,
+                server_message_data = #server_message {
+                    message = get_weather_forecast()
+                }
+            },
+            Data = utils:add_envelope(Response),
+            Transport:send(Socket,Data),
+            handle_client(State);
+
+        {<<"2">>} ->
+            Response = #req{
+                type = server_message,
+                server_message_data = #server_message {
+                    message = get_joke_of_the_day()
+                }
+            },
+            Data = utils:add_envelope(Response),
+            Transport:send(Socket,Data),
+            handle_client(State);
+
+        {<<"3">>} ->
+            Response = #req{
+                type = server_message,
+                server_message_data = #server_message {
+                    message = pid_to_list(self())
+                }
+            },
+            Data = utils:add_envelope(Response),
+            Transport:send(Socket,Data),
+            handle_client(State);
+
+        {<<"4">>} ->
+            Response = #req{
+                type = server_message,
+                server_message_data = #server_message {
+                    message = "Work in progress"
+                }
+            },
+            Data = utils:add_envelope(Response),
+            Transport:send(Socket,Data),
+            handle_client(State);
+
+        {_} ->
+            Response = #req{
+                type = server_message,
+                server_message_data = #server_message {
+                    message = show_menu()
+                }
+            },
+            Data = utils:add_envelope(Response),
+            Transport:send(Socket,Data),
+            
+            handle_client(State)
+    end.
+
+show_menu() ->
+    "Hi! Press 1 to receive the weather forecast\n2 - Press 2 to receive the joke of the day\n3 - Press 3 to request your call ID\n4 - Press 4 to ask for an operator".
+
+get_weather_forecast() ->
+    List = ["Sunny","Rainy","Cloudy"],
+	Index = rand:uniform(length(List)),
+	lists:nth(Index, List).
+
+get_joke_of_the_day() ->
+    List = ["Funny Joke 1","Funny Joke 2","Funny Joke 3"],
+	Index = rand:uniform(length(List)),
+	lists:nth(Index, List).

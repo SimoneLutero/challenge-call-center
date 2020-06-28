@@ -21,12 +21,21 @@
         }).
 -endif.
 
+-ifndef('CLIENT_MESSAGE_PB_H').
+-define('CLIENT_MESSAGE_PB_H', true).
+-record(client_message,
+        {username               :: iodata(),        % = 1
+         message_body           :: iodata()         % = 2
+        }).
+-endif.
+
 -ifndef('REQ_PB_H').
 -define('REQ_PB_H', true).
 -record(req,
-        {type                   :: create_session | server_message | integer(), % = 1, enum req.type_enum
+        {type                   :: create_session | server_message | client_message | integer(), % = 1, enum req.type_enum
          create_session_data    :: erl_playground_pb:create_session() | undefined, % = 2
-         server_message_data    :: erl_playground_pb:server_message() | undefined % = 3
+         server_message_data    :: erl_playground_pb:server_message() | undefined, % = 3
+         client_message_data    :: erl_playground_pb:client_message() | undefined % = 4
         }).
 -endif.
 
