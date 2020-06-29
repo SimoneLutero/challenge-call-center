@@ -11,16 +11,22 @@ message client_message {
     required string message_body = 2;
 }
 
+message close_session {
+    required string username = 1;
+}
+
 message req {
     enum type_enum {
         create_session = 1;
         server_message = 2;
         client_message = 3;
+        close_session = 4;
     }
     required type_enum type = 1;
     optional create_session create_session_data = 2;
     optional server_message server_message_data = 3;
     optional client_message client_message_data = 4;
+    optional close_session close_session_data = 5;
 }
 
 message envelope {

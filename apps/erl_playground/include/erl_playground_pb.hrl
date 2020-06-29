@@ -29,13 +29,21 @@
         }).
 -endif.
 
+-ifndef('CLOSE_SESSION_PB_H').
+-define('CLOSE_SESSION_PB_H', true).
+-record(close_session,
+        {username               :: iodata()         % = 1
+        }).
+-endif.
+
 -ifndef('REQ_PB_H').
 -define('REQ_PB_H', true).
 -record(req,
-        {type                   :: create_session | server_message | client_message | integer(), % = 1, enum req.type_enum
+        {type                   :: create_session | server_message | client_message | close_session | integer(), % = 1, enum req.type_enum
          create_session_data    :: erl_playground_pb:create_session() | undefined, % = 2
          server_message_data    :: erl_playground_pb:server_message() | undefined, % = 3
-         client_message_data    :: erl_playground_pb:client_message() | undefined % = 4
+         client_message_data    :: erl_playground_pb:client_message() | undefined, % = 4
+         close_session_data     :: erl_playground_pb:close_session() | undefined % = 5
         }).
 -endif.
 

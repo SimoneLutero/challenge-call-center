@@ -9,7 +9,7 @@
 
 -export([start_link/0]). -ignore_xref([{start_link, 4}]).
 -export([connect/0, disconnect/0]).
--export([send_create_session/0, send_create_session/1]).
+-export([send_create_session/1, send_close_session/1]).
 -export([send_message/2]).
 
 %% ------------------------------------------------------------------
@@ -65,6 +65,12 @@ send_create_session(Username) ->
     },
     gen_server:cast(whereis(?SERVER), {create_session, CreateSession}).
 
+send_close_session(Username) ->
+    CloseSession = #close_session {
+        username = Username
+    },
+    gen_server:cast(whereis(?SERVER), {close_session, CloseSession}).
+
 send_message(Username, Message) ->
     ClientMessage = #client_message {
         username = Username,
@@ -90,6 +96,18 @@ handle_cast({create_session, CreateSession}, #state{socket = Socket} = State)
     },
     Data = utils:add_envelope(Req),
 
+    gen_tcp:send(Socket, Data),
+
+    {noreply, State};
+
+handle_cast({close_session, CloseSession}, #state{socket = Socket} = State)
+    when Socket =/= undefined ->
+    Req = #req {
+        type = close_session,
+        close_session_data = CloseSession
+    },
+    Data = utils:add_envelope(Req),
+    
     gen_tcp:send(Socket, Data),
 
     {noreply, State};
