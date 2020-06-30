@@ -161,7 +161,8 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
             username = UsernameBinary
         }
     } = Req,
-    _ = lager:info("create_session received from user ~p, socket ~p, transport ~p", [UsernameBinary, Socket, Transport]),
+    % _ = lager:info("create_session received from user ~p, socket ~p, transport ~p", [UsernameBinary, Socket, Transport]),
+    _ = lager:info("create_session received from user ~p", [UsernameBinary]),
 
     UsernameAtom = binary_to_atom(UsernameBinary, utf8),  
 
@@ -201,7 +202,7 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
     %spawn a process with client name
     Feedback = case whereis(UsernameAtom) of 
         undefined ->
-            "no session exists";
+            "session not found";
         _else ->
             UsernameAtom ! {exit, normal},
             "session closed"

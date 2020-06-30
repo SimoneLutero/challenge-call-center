@@ -6,7 +6,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([handle_client/1, operator/3]).
+-export([handle_client/1, handle_client/2, operator/3]).
 
 %% ------------------------------------------------------------------
 %% Record Definitions
@@ -18,84 +18,62 @@
 }).
 -type state() :: #state{}.
 
-handle_client(State = {ok, #state{socket = Socket, transport = Transport}}) ->
+%% ------------------------------------------------------------------
+%% API Function Definition
+%% ------------------------------------------------------------------
+
+send_response_message(Message, State = {ok, #state{socket = Socket, transport = Transport}}) ->
+    Response = #req{
+        type = server_message,
+        server_message_data = #server_message {
+            message = Message
+        }
+    },
+    Data = utils:add_envelope(Response),
+    Transport:send(Socket,Data),
+
+    State.
+
+handle_client(State) ->
+    send_response_message(show_menu(), State),
     receive
         {<<"1">>} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = get_weather_forecast()
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message(get_weather_forecast(), State),
             handle_client(State);
 
         {<<"2">>} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = get_joke_of_the_day()
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message(get_joke_of_the_day(), State),
             handle_client(State);
 
         {<<"3">>} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = pid_to_list(self())
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message(pid_to_list(self()), State),
             handle_client(State);
 
         {<<"4">>} ->
             PidOperator = spawn(?MODULE, operator, [self(), 0, State]),
             PidOperator ! {welcome},
-
-            self() ! {handle_operator, PidOperator};
-            % receive
-            %     {PidOperator, terminated} ->
-            %         handle_client(State);
-            %     {MessageForOperator} ->
-            %         PidOperator ! {MessageForOperator},
-            %         self() ! {<<"4">>, continue}
-            % end;
-
-        {handle_operator, PidOperator} ->
-            receive
-                {PidOperator, terminated} ->
-                    Response = #req{
-                        type = server_message,
-                        server_message_data = #server_message {
-                            message = "Conversation with operator is terminated"
-                        }
-                    },
-                    Data = utils:add_envelope(Response),
-                    Transport:send(Socket,Data),
-                    handle_client(State);
-                {MessageForOperator} ->
-                    PidOperator ! {MessageForOperator},
-                    self() ! {handle_operator, PidOperator}
-            end;
+            handle_client(State, PidOperator);
 
         {exit, Reason} ->
             exit(Reason);
 
         {_} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = show_menu()
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            
+            send_response_message(show_menu(), State),            
+            handle_client(State)
+    end.
+
+handle_client(State, PidOperator) ->
+    receive
+        {MessageForOperator} ->
+            case process_info(PidOperator) of
+                undefined ->
+                    send_response_message("Conversation with operator is already terminated", State);
+                _else ->
+                    PidOperator ! {MessageForOperator},
+                    handle_client(State, PidOperator)
+            end;
+        {PidOperator, terminated} ->
+            send_response_message("Conversation with operator is terminated", State),
             handle_client(State)
     end.
 
@@ -112,86 +90,42 @@ get_joke_of_the_day() ->
 	Index = rand:uniform(length(List)),
 	lists:nth(Index, List).
 
-operator(FatherPid, Count, State = {ok, #state{socket = Socket, transport = Transport}})
-    when Count < 3 ->
+operator(FatherPid, Count, State)
+    when Count < 4 ->
     receive
         {Message} when is_list(Message) ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "This process Pid is " ++ pid_to_list(self())
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message("This process Pid is " ++ pid_to_list(self()), State),
             operator(FatherPid, Count + 1, State);
 
         {Message} when is_integer(Message) ->
-            case even(Message) of
+            Feedback = case even(Message) of
                 true ->
-                    Feedback = "The number is even";
+                    "The number is even";
                 false ->
-                    Feedback = "The number is odd"
+                    "The number is odd"
             end,
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = Feedback
-                }
-            },            
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message(Feedback, State),
             operator(FatherPid, Count + 1, State);
 
         {welcome} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "Hi, I'm the operator " ++ pid_to_list(self()) ++ ", how can I help you?"
-                }
-            },            
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message("Hi, I'm the operator " ++ pid_to_list(self()) ++ ", how can I help you?", State),
             operator(FatherPid, Count + 1, State);
 
         {_} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "I don't understand"
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message("I don't understand", State),
             operator(FatherPid, Count + 1, State)
 
     after
         10000 ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "Time's up, see you soon"
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
+            send_response_message("Time's up, see you soon", State),
             FatherPid ! {self(), terminated},
             exit(normal)
     end;
 
-operator(FatherPid, Count, State = {ok, #state{socket = Socket, transport = Transport}})
+operator(FatherPid, Count, State)
     when Count > 3 ->
-    Response = #req{
-        type = server_message,
-        server_message_data = #server_message {
-            message = "Max number of questions reached, see you soon"
-        }
-    },
-    Data = utils:add_envelope(Response),
-    Transport:send(Socket,Data),
+    send_response_message("Max number of questions reached, see you soon", State),
     FatherPid ! {self(), terminated},
-    exit(normal),
-    State.
-
+    exit(normal).
             
 even(X) when X >= 0 -> (X band 1) == 0.
