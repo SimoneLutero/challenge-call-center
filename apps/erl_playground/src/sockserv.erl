@@ -10,7 +10,6 @@
 
 -export([start_link/4]). -ignore_xref([{start_link, 4}]).
 -export([start/0]).
--export([handle_client/1]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -115,6 +114,7 @@ handle_cast(Message, State) ->
 handle_info({tcp, _Port, <<>>}, State) ->
     _ = lager:notice("empty handle_info state: ~p", [State]),
     {noreply, State};
+
 handle_info({tcp, _Port, Packet}, State = {ok, #state{socket = Socket}}) ->
     Req = utils:open_envelope(Packet),
 
@@ -122,8 +122,10 @@ handle_info({tcp, _Port, Packet}, State = {ok, #state{socket = Socket}}) ->
     ok = inet:setopts(Socket, [{active, once}]),
 
     {noreply, State};
+
 handle_info({tcp_closed, _Port}, State) ->
     {stop, normal, State};
+
 handle_info(Message, State) ->
     _ = lager:notice("unknown handle_info ~p", [Message]),
     {noreply, State}.
@@ -135,6 +137,7 @@ handle_call(Message, _From, State) ->
 terminate(normal, _State) ->
     _ = lager:info("Goodbye!"),
     ok;
+
 terminate(Reason, _State) ->
     _ = lager:notice("No terminate for ~p", [Reason]),
     ok.
@@ -150,6 +153,7 @@ code_change(_OldVsn, State, _Extra) ->
 process_packet(undefined, State, _Now) ->
     _ = lager:notice("client sent invalid packet, ignoring ~p",[State]),
     State;
+
 process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, transport = Transport}}, _Now)
     when Type =:= create_session ->
     #req{
@@ -157,17 +161,17 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
             username = UsernameBinary
         }
     } = Req,
-    _ = lager:info("create_session received from ~p", [UsernameBinary]),
+    _ = lager:info("create_session received from user ~p, socket ~p, transport ~p", [UsernameBinary, Socket, Transport]),
 
-    UsernameAtom = binary_to_atom(UsernameBinary, utf8),
+    UsernameAtom = binary_to_atom(UsernameBinary, utf8),  
 
     %spawn a process with client name
-    case whereis(UsernameAtom) of 
+    Feedback = case whereis(UsernameAtom) of 
         undefined ->
-            register(UsernameAtom, spawn(?MODULE, handle_client, [State])),
-            Feedback = "session created";
+            register(UsernameAtom, spawn(call_center_serv_logic, handle_client, [State])),
+            "session created";
         _else ->
-            Feedback = "session already exists"
+            "session already exists"
     end,
 
     Response = #req{
@@ -186,7 +190,7 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
 process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, transport = Transport}}, _Now)
     when Type =:= close_session ->
     #req{
-        close_session_data = #create_session {
+        close_session_data = #close_session {
             username = UsernameBinary
         }
     } = Req,
@@ -195,12 +199,12 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
     UsernameAtom = binary_to_atom(UsernameBinary, utf8),
 
     %spawn a process with client name
-    case whereis(UsernameAtom) of 
+    Feedback = case whereis(UsernameAtom) of 
         undefined ->
-            Feedback = "no session exists";
+            "no session exists";
         _else ->
             UsernameAtom ! {exit, normal},
-            Feedback = "session closed"
+            "session closed"
     end,
 
     Response = #req{
@@ -226,171 +230,22 @@ process_packet(#req{ type = Type } = Req, State, _Now)
 
     UsernameAtom = binary_to_atom(UsernameBinary, utf8), 
     
-    case whereis(UsernameAtom) of 
+    NewState = case whereis(UsernameAtom) of 
         undefined ->
             _ = lager:info("session not found, creating a session"),
-            process_packet(#req{ type = create_session, create_session_data = UsernameBinary}, State, _Now);
+            CSReq = #req {
+                type = create_session,
+                create_session_data = #create_session{
+                    username = UsernameBinary
+                }
+            },
+            process_packet(CSReq, State, _Now);
         _else ->
-            ok
+            State
     end,
 
     %send data to process with client name
     UsernameAtom ! {MessageBody},
 
-    State.
+    NewState.
 
-handle_client(State = {ok, #state{socket = Socket, transport = Transport}}) ->
-    receive
-        {<<"1">>} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = get_weather_forecast()
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            handle_client(State);
-
-        {<<"2">>} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = get_joke_of_the_day()
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            handle_client(State);
-
-        {<<"3">>} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = pid_to_list(self())
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            handle_client(State);
-
-        {<<"4">>} ->
-            PidOperator = spawn(sockserv, operator, [self(), 0, State]),
-
-            receive
-                {PidOperator, terminated} ->
-                    handle_client(State)
-            end,
-
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "Conversation with operator is terminated"
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            handle_client(State);
-
-        {exit, Reason} ->
-            exit(Reason);
-
-        {_} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = show_menu()
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            
-            handle_client(State)
-    end.
-
-show_menu() ->
-    "Hi! Press 1 to receive the weather forecast\n2 - Press 2 to receive the joke of the day\n3 - Press 3 to request your call ID\n4 - Press 4 to ask for an operator".
-
-get_weather_forecast() ->
-    List = ["Sunny","Rainy","Cloudy"],
-	Index = rand:uniform(length(List)),
-	lists:nth(Index, List).
-
-get_joke_of_the_day() ->
-    List = ["Funny Joke 1","Funny Joke 2","Funny Joke 3"],
-	Index = rand:uniform(length(List)),
-	lists:nth(Index, List).
-
-operator(FatherPid, Count, State = {ok, #state{socket = Socket, transport = Transport}})
-    when Count < 3 ->
-    receive
-        {Message} when is_list(Message) ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "This process Pid is " ++ pid_to_list(self())
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            operator(FatherPid, Count + 1, State);
-
-        {Message} when is_integer(Message) ->
-            case even(Message) of
-                true ->
-                    Feedback = "The number is even";
-                false ->
-                    Feedback = "The number is odd"
-            end,
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = Feedback
-                }
-            },            
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            operator(FatherPid, Count + 1, State);
-
-        {_} ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "I don't understand"
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            operator(FatherPid, Count + 1, State)
-
-    after
-        10000 ->
-            Response = #req{
-                type = server_message,
-                server_message_data = #server_message {
-                    message = "Time's up, see you soon"
-                }
-            },
-            Data = utils:add_envelope(Response),
-            Transport:send(Socket,Data),
-            FatherPid ! {self(), terminated},
-            exit(normal)
-    end;
-
-operator(FatherPid, Count, State = {ok, #state{socket = Socket, transport = Transport}})
-    when Count > 3 ->
-    Response = #req{
-        type = server_message,
-        server_message_data = #server_message {
-            message = "Max number of questions reached, see you soon"
-        }
-    },
-    Data = utils:add_envelope(Response),
-    Transport:send(Socket,Data),
-    FatherPid ! {self(), terminated},
-    exit(normal).
-
-            
-even(X) when X >= 0 -> (X band 1) == 0.
-
-% odd(X) when X > 0 -> not even(X).

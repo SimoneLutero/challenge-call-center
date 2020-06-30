@@ -52,13 +52,6 @@ disconnect() ->
     gen_server:call(whereis(?SERVER), disconnect),
     ok.
 
--spec send_create_session() -> ok.
-send_create_session() ->
-    CreateSession = #create_session {
-        username = <<"TestUser">>
-    },
-    gen_server:cast(whereis(?SERVER), {create_session, CreateSession}).
-
 send_create_session(Username) ->
     CreateSession = #create_session {
         username = Username
@@ -145,12 +138,14 @@ handle_call(connect, _From, State) ->
     {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 2}]),
 
     {reply, normal, State#state{socket = Socket}};
+
 handle_call(disconnect, _From, #state{socket = Socket} = State)
     when Socket =/= undefined ->
-    
+   
     gen_tcp:shutdown(Socket, read_write),
 
     {reply, normal, State};
+
 handle_call(Message, _From, State) ->
     _ = lager:warning("No handle_call for ~p", [Message]),
     {reply, normal, State}.
