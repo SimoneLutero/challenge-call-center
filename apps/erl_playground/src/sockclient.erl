@@ -123,10 +123,12 @@ handle_cast(Message, State) ->
 
 handle_info({tcp_closed, _Port}, State) ->
     {noreply, State#state{socket = undefined}};
+
 handle_info({tcp, _Port, Packet}, State) ->
     Req = utils:open_envelope(Packet),
     State = process_packet(Req, State, utils:unix_timestamp()),
     {noreply, State};
+
 handle_info(Message, State) ->
     _ = lager:warning("No handle_info for~p", [Message]),
     {noreply, State}.
@@ -165,6 +167,7 @@ code_change(_OldVsn, State, _Extra) ->
 process_packet(undefined, State, _Now) ->
     lager:notice("server sent invalid packet, ignoring"),
     State;
+
 process_packet(#req{ type = Type } = Req, State, _Now)
     when Type =:= server_message ->
     #req{

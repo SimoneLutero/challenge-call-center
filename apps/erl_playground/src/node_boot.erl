@@ -26,7 +26,7 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
-% MODULE is name of this module (node_boot in this case)
+% ?MODULE is name of this module (node_boot in this case)
 
 -define(SERVER, ?MODULE).
 -define(CB_MODULE, ?MODULE).

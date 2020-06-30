@@ -40,6 +40,7 @@
 
 -define(SERVER, ?MODULE).
 -define(CB_MODULE, ?MODULE).
+-define(CLIENT_HANDLER_MODULE, call_center_serv_logic).
 
 %% ------------------------------------------------------------------
 %% API Function Definition
@@ -154,41 +155,30 @@ process_packet(undefined, State, _Now) ->
     _ = lager:notice("client sent invalid packet, ignoring ~p",[State]),
     State;
 
-process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, transport = Transport}}, _Now)
+process_packet(#req{ type = Type } = Req, State, _Now)
     when Type =:= create_session ->
     #req{
         create_session_data = #create_session {
             username = UsernameBinary
         }
     } = Req,
-    % _ = lager:info("create_session received from user ~p, socket ~p, transport ~p", [UsernameBinary, Socket, Transport]),
     _ = lager:info("create_session received from user ~p", [UsernameBinary]),
-
     UsernameAtom = binary_to_atom(UsernameBinary, utf8),  
 
     %spawn a process with client name
     Feedback = case whereis(UsernameAtom) of 
         undefined ->
-            register(UsernameAtom, spawn(call_center_serv_logic, handle_client, [State])),
+            register(UsernameAtom, spawn(?CLIENT_HANDLER_MODULE, handle_client, [State])),
             "session created";
         _else ->
             "session already exists"
     end,
 
-    Response = #req{
-        type = server_message,
-        server_message_data = #server_message {
-            message = Feedback
-        }
-    },
-    Data = utils:add_envelope(Response),
-    Transport:send(Socket,Data),
-
-    UsernameAtom ! {normal},
+    utils:send_response_message(Feedback, State),
 
     State;
 
-process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, transport = Transport}}, _Now)
+process_packet(#req{ type = Type } = Req, State, _Now)
     when Type =:= close_session ->
     #req{
         close_session_data = #close_session {
@@ -208,14 +198,7 @@ process_packet(#req{ type = Type } = Req, State = {ok, #state{socket = Socket, t
             "session closed"
     end,
 
-    Response = #req{
-        type = server_message,
-        server_message_data = #server_message {
-            message = Feedback
-        }
-    },
-    Data = utils:add_envelope(Response),
-    Transport:send(Socket,Data),
+    utils:send_response_message(Feedback, State),
 
     State;
 
