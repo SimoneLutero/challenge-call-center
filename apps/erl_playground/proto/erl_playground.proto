@@ -7,8 +7,14 @@ message server_message {
 }
 
 message client_message {
-    required string username = 1;
-    required string message_body = 2;
+    enum type_enum {
+        integer_message = 1;
+        string_message = 2;
+    }
+    required type_enum type = 1;
+    required string username = 2;
+    optional sint64 integer_body = 3;
+    optional string string_body = 4;
 }
 
 message close_session {

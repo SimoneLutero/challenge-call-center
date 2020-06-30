@@ -16,6 +16,7 @@
 -export([find_msg_def/1, fetch_msg_def/1]).
 -export([find_enum_def/1, fetch_enum_def/1]).
 -export([enum_symbol_by_value/2, enum_value_by_symbol/2]).
+-export(['enum_symbol_by_value_client_message.type_enum'/1, 'enum_value_by_symbol_client_message.type_enum'/1]).
 -export(['enum_symbol_by_value_req.type_enum'/1, 'enum_value_by_symbol_req.type_enum'/1]).
 -export([get_service_names/0]).
 -export([get_service_def/1]).
@@ -49,8 +50,9 @@
 -include("gpb.hrl").
 
 %% enumerated types
+-type 'client_message.type_enum'() :: integer_message | string_message.
 -type 'req.type_enum'() :: create_session | server_message | client_message | close_session.
--export_type(['req.type_enum'/0]).
+-export_type(['client_message.type_enum'/0, 'req.type_enum'/0]).
 
 %% message types
 -type create_session() :: #create_session{}.
@@ -128,16 +130,32 @@ encode_msg_client_message(Msg, TrUserData) ->
     encode_msg_client_message(Msg, <<>>, TrUserData).
 
 
-encode_msg_client_message(#client_message{username = F1,
-					  message_body = F2},
+encode_msg_client_message(#client_message{type = F1,
+					  username = F2, integer_body = F3,
+					  string_body = F4},
 			  Bin, TrUserData) ->
     B1 = begin
 	   TrF1 = id(F1, TrUserData),
-	   e_type_string(TrF1, <<Bin/binary, 10>>, TrUserData)
+	   'e_enum_client_message.type_enum'(TrF1,
+					     <<Bin/binary, 8>>, TrUserData)
 	 end,
-    begin
-      TrF2 = id(F2, TrUserData),
-      e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+    B2 = begin
+	   TrF2 = id(F2, TrUserData),
+	   e_type_string(TrF2, <<B1/binary, 18>>, TrUserData)
+	 end,
+    B3 = if F3 == undefined -> B2;
+	    true ->
+		begin
+		  TrF3 = id(F3, TrUserData),
+		  e_type_sint(TrF3, <<B2/binary, 24>>, TrUserData)
+		end
+	 end,
+    if F4 == undefined -> B3;
+       true ->
+	   begin
+	     TrF4 = id(F4, TrUserData),
+	     e_type_string(TrF4, <<B3/binary, 34>>, TrUserData)
+	   end
     end.
 
 encode_msg_close_session(Msg, TrUserData) ->
@@ -244,6 +262,16 @@ e_mfield_envelope_uncompressed_data(Msg, Bin,
     SubBin = encode_msg_req(Msg, <<>>, TrUserData),
     Bin2 = e_varint(byte_size(SubBin), Bin),
     <<Bin2/binary, SubBin/binary>>.
+
+'e_enum_client_message.type_enum'(integer_message, Bin,
+				  _TrUserData) ->
+    <<Bin/binary, 1>>;
+'e_enum_client_message.type_enum'(string_message, Bin,
+				  _TrUserData) ->
+    <<Bin/binary, 2>>;
+'e_enum_client_message.type_enum'(V, Bin,
+				  _TrUserData) ->
+    e_varint(V, Bin).
 
 'e_enum_req.type_enum'(create_session, Bin,
 		       _TrUserData) ->
@@ -608,136 +636,202 @@ skip_64_server_message(<<_:64, Rest/binary>>, Z1, Z2,
 decode_msg_client_message(Bin, TrUserData) ->
     dfp_read_field_def_client_message(Bin, 0, 0,
 				      id(undefined, TrUserData),
+				      id(undefined, TrUserData),
+				      id(undefined, TrUserData),
 				      id(undefined, TrUserData), TrUserData).
 
-dfp_read_field_def_client_message(<<10, Rest/binary>>,
-				  Z1, Z2, F@_1, F@_2, TrUserData) ->
-    d_field_client_message_username(Rest, Z1, Z2, F@_1,
-				    F@_2, TrUserData);
+dfp_read_field_def_client_message(<<8, Rest/binary>>,
+				  Z1, Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_client_message_type(Rest, Z1, Z2, F@_1, F@_2,
+				F@_3, F@_4, TrUserData);
 dfp_read_field_def_client_message(<<18, Rest/binary>>,
-				  Z1, Z2, F@_1, F@_2, TrUserData) ->
-    d_field_client_message_message_body(Rest, Z1, Z2, F@_1,
-					F@_2, TrUserData);
+				  Z1, Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_client_message_username(Rest, Z1, Z2, F@_1,
+				    F@_2, F@_3, F@_4, TrUserData);
+dfp_read_field_def_client_message(<<24, Rest/binary>>,
+				  Z1, Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_client_message_integer_body(Rest, Z1, Z2, F@_1,
+					F@_2, F@_3, F@_4, TrUserData);
+dfp_read_field_def_client_message(<<34, Rest/binary>>,
+				  Z1, Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
+    d_field_client_message_string_body(Rest, Z1, Z2, F@_1,
+				       F@_2, F@_3, F@_4, TrUserData);
 dfp_read_field_def_client_message(<<>>, 0, 0, F@_1,
-				  F@_2, _) ->
-    #client_message{username = F@_1, message_body = F@_2};
+				  F@_2, F@_3, F@_4, _) ->
+    #client_message{type = F@_1, username = F@_2,
+		    integer_body = F@_3, string_body = F@_4};
 dfp_read_field_def_client_message(Other, Z1, Z2, F@_1,
-				  F@_2, TrUserData) ->
+				  F@_2, F@_3, F@_4, TrUserData) ->
     dg_read_field_def_client_message(Other, Z1, Z2, F@_1,
-				     F@_2, TrUserData).
+				     F@_2, F@_3, F@_4, TrUserData).
 
 dg_read_field_def_client_message(<<1:1, X:7,
 				   Rest/binary>>,
-				 N, Acc, F@_1, F@_2, TrUserData)
+				 N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 32 - 7 ->
     dg_read_field_def_client_message(Rest, N + 7,
-				     X bsl N + Acc, F@_1, F@_2, TrUserData);
+				     X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				     TrUserData);
 dg_read_field_def_client_message(<<0:1, X:7,
 				   Rest/binary>>,
-				 N, Acc, F@_1, F@_2, TrUserData) ->
+				 N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
     Key = X bsl N + Acc,
     case Key of
-      10 ->
-	  d_field_client_message_username(Rest, 0, 0, F@_1, F@_2,
-					  TrUserData);
+      8 ->
+	  d_field_client_message_type(Rest, 0, 0, F@_1, F@_2,
+				      F@_3, F@_4, TrUserData);
       18 ->
-	  d_field_client_message_message_body(Rest, 0, 0, F@_1,
-					      F@_2, TrUserData);
+	  d_field_client_message_username(Rest, 0, 0, F@_1, F@_2,
+					  F@_3, F@_4, TrUserData);
+      24 ->
+	  d_field_client_message_integer_body(Rest, 0, 0, F@_1,
+					      F@_2, F@_3, F@_4, TrUserData);
+      34 ->
+	  d_field_client_message_string_body(Rest, 0, 0, F@_1,
+					     F@_2, F@_3, F@_4, TrUserData);
       _ ->
 	  case Key band 7 of
 	    0 ->
-		skip_varint_client_message(Rest, 0, 0, F@_1, F@_2,
-					   TrUserData);
+		skip_varint_client_message(Rest, 0, 0, F@_1, F@_2, F@_3,
+					   F@_4, TrUserData);
 	    1 ->
-		skip_64_client_message(Rest, 0, 0, F@_1, F@_2,
-				       TrUserData);
+		skip_64_client_message(Rest, 0, 0, F@_1, F@_2, F@_3,
+				       F@_4, TrUserData);
 	    2 ->
 		skip_length_delimited_client_message(Rest, 0, 0, F@_1,
-						     F@_2, TrUserData);
+						     F@_2, F@_3, F@_4,
+						     TrUserData);
 	    3 ->
 		skip_group_client_message(Rest, Key bsr 3, 0, F@_1,
-					  F@_2, TrUserData);
+					  F@_2, F@_3, F@_4, TrUserData);
 	    5 ->
-		skip_32_client_message(Rest, 0, 0, F@_1, F@_2,
-				       TrUserData)
+		skip_32_client_message(Rest, 0, 0, F@_1, F@_2, F@_3,
+				       F@_4, TrUserData)
 	  end
     end;
 dg_read_field_def_client_message(<<>>, 0, 0, F@_1, F@_2,
-				 _) ->
-    #client_message{username = F@_1, message_body = F@_2}.
+				 F@_3, F@_4, _) ->
+    #client_message{type = F@_1, username = F@_2,
+		    integer_body = F@_3, string_body = F@_4}.
+
+d_field_client_message_type(<<1:1, X:7, Rest/binary>>,
+			    N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+    when N < 57 ->
+    d_field_client_message_type(Rest, N + 7, X bsl N + Acc,
+				F@_1, F@_2, F@_3, F@_4, TrUserData);
+d_field_client_message_type(<<0:1, X:7, Rest/binary>>,
+			    N, Acc, _, F@_2, F@_3, F@_4, TrUserData) ->
+    {NewFValue, RestF} =
+	{id('d_enum_client_message.type_enum'(begin
+						<<Res:32/signed-native>> = <<(X
+										bsl
+										N
+										+
+										Acc):32/unsigned-native>>,
+						id(Res, TrUserData)
+					      end),
+	    TrUserData),
+	 Rest},
+    dfp_read_field_def_client_message(RestF, 0, 0,
+				      NewFValue, F@_2, F@_3, F@_4, TrUserData).
 
 d_field_client_message_username(<<1:1, X:7,
 				  Rest/binary>>,
-				N, Acc, F@_1, F@_2, TrUserData)
+				N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
     d_field_client_message_username(Rest, N + 7,
-				    X bsl N + Acc, F@_1, F@_2, TrUserData);
+				    X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				    TrUserData);
 d_field_client_message_username(<<0:1, X:7,
 				  Rest/binary>>,
-				N, Acc, _, F@_2, TrUserData) ->
-    {NewFValue, RestF} = begin
-			   Len = X bsl N + Acc,
-			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
-			   {id(binary:copy(Bytes), TrUserData), Rest2}
-			 end,
-    dfp_read_field_def_client_message(RestF, 0, 0,
-				      NewFValue, F@_2, TrUserData).
-
-d_field_client_message_message_body(<<1:1, X:7,
-				      Rest/binary>>,
-				    N, Acc, F@_1, F@_2, TrUserData)
-    when N < 57 ->
-    d_field_client_message_message_body(Rest, N + 7,
-					X bsl N + Acc, F@_1, F@_2, TrUserData);
-d_field_client_message_message_body(<<0:1, X:7,
-				      Rest/binary>>,
-				    N, Acc, F@_1, _, TrUserData) ->
+				N, Acc, F@_1, _, F@_3, F@_4, TrUserData) ->
     {NewFValue, RestF} = begin
 			   Len = X bsl N + Acc,
 			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
 			   {id(binary:copy(Bytes), TrUserData), Rest2}
 			 end,
     dfp_read_field_def_client_message(RestF, 0, 0, F@_1,
-				      NewFValue, TrUserData).
+				      NewFValue, F@_3, F@_4, TrUserData).
+
+d_field_client_message_integer_body(<<1:1, X:7,
+				      Rest/binary>>,
+				    N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+    when N < 57 ->
+    d_field_client_message_integer_body(Rest, N + 7,
+					X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+					TrUserData);
+d_field_client_message_integer_body(<<0:1, X:7,
+				      Rest/binary>>,
+				    N, Acc, F@_1, F@_2, _, F@_4, TrUserData) ->
+    {NewFValue, RestF} = {begin
+			    ZValue = X bsl N + Acc,
+			    if ZValue band 1 =:= 0 ->
+				   id(ZValue bsr 1, TrUserData);
+			       true -> id(-(ZValue + 1 bsr 1), TrUserData)
+			    end
+			  end,
+			  Rest},
+    dfp_read_field_def_client_message(RestF, 0, 0, F@_1,
+				      F@_2, NewFValue, F@_4, TrUserData).
+
+d_field_client_message_string_body(<<1:1, X:7,
+				     Rest/binary>>,
+				   N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
+    when N < 57 ->
+    d_field_client_message_string_body(Rest, N + 7,
+				       X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+				       TrUserData);
+d_field_client_message_string_body(<<0:1, X:7,
+				     Rest/binary>>,
+				   N, Acc, F@_1, F@_2, F@_3, _, TrUserData) ->
+    {NewFValue, RestF} = begin
+			   Len = X bsl N + Acc,
+			   <<Bytes:Len/binary, Rest2/binary>> = Rest,
+			   {id(binary:copy(Bytes), TrUserData), Rest2}
+			 end,
+    dfp_read_field_def_client_message(RestF, 0, 0, F@_1,
+				      F@_2, F@_3, NewFValue, TrUserData).
 
 skip_varint_client_message(<<1:1, _:7, Rest/binary>>,
-			   Z1, Z2, F@_1, F@_2, TrUserData) ->
+			   Z1, Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
     skip_varint_client_message(Rest, Z1, Z2, F@_1, F@_2,
-			       TrUserData);
+			       F@_3, F@_4, TrUserData);
 skip_varint_client_message(<<0:1, _:7, Rest/binary>>,
-			   Z1, Z2, F@_1, F@_2, TrUserData) ->
+			   Z1, Z2, F@_1, F@_2, F@_3, F@_4, TrUserData) ->
     dfp_read_field_def_client_message(Rest, Z1, Z2, F@_1,
-				      F@_2, TrUserData).
+				      F@_2, F@_3, F@_4, TrUserData).
 
 skip_length_delimited_client_message(<<1:1, X:7,
 				       Rest/binary>>,
-				     N, Acc, F@_1, F@_2, TrUserData)
+				     N, Acc, F@_1, F@_2, F@_3, F@_4, TrUserData)
     when N < 57 ->
     skip_length_delimited_client_message(Rest, N + 7,
-					 X bsl N + Acc, F@_1, F@_2, TrUserData);
+					 X bsl N + Acc, F@_1, F@_2, F@_3, F@_4,
+					 TrUserData);
 skip_length_delimited_client_message(<<0:1, X:7,
 				       Rest/binary>>,
-				     N, Acc, F@_1, F@_2, TrUserData) ->
+				     N, Acc, F@_1, F@_2, F@_3, F@_4,
+				     TrUserData) ->
     Length = X bsl N + Acc,
     <<_:Length/binary, Rest2/binary>> = Rest,
     dfp_read_field_def_client_message(Rest2, 0, 0, F@_1,
-				      F@_2, TrUserData).
+				      F@_2, F@_3, F@_4, TrUserData).
 
 skip_group_client_message(Bin, FNum, Z2, F@_1, F@_2,
-			  TrUserData) ->
+			  F@_3, F@_4, TrUserData) ->
     {_, Rest} = read_group(Bin, FNum),
     dfp_read_field_def_client_message(Rest, 0, Z2, F@_1,
-				      F@_2, TrUserData).
+				      F@_2, F@_3, F@_4, TrUserData).
 
 skip_32_client_message(<<_:32, Rest/binary>>, Z1, Z2,
-		       F@_1, F@_2, TrUserData) ->
+		       F@_1, F@_2, F@_3, F@_4, TrUserData) ->
     dfp_read_field_def_client_message(Rest, Z1, Z2, F@_1,
-				      F@_2, TrUserData).
+				      F@_2, F@_3, F@_4, TrUserData).
 
 skip_64_client_message(<<_:64, Rest/binary>>, Z1, Z2,
-		       F@_1, F@_2, TrUserData) ->
+		       F@_1, F@_2, F@_3, F@_4, TrUserData) ->
     dfp_read_field_def_client_message(Rest, Z1, Z2, F@_1,
-				      F@_2, TrUserData).
+				      F@_2, F@_3, F@_4, TrUserData).
 
 decode_msg_close_session(Bin, TrUserData) ->
     dfp_read_field_def_close_session(Bin, 0, 0,
@@ -1193,6 +1287,10 @@ skip_64_envelope(<<_:64, Rest/binary>>, Z1, Z2, F@_1,
     dfp_read_field_def_envelope(Rest, Z1, Z2, F@_1,
 				TrUserData).
 
+'d_enum_client_message.type_enum'(1) -> integer_message;
+'d_enum_client_message.type_enum'(2) -> string_message;
+'d_enum_client_message.type_enum'(V) -> V.
+
 'd_enum_req.type_enum'(1) -> create_session;
 'd_enum_req.type_enum'(2) -> server_message;
 'd_enum_req.type_enum'(3) -> client_message;
@@ -1294,12 +1392,22 @@ merge_msg_server_message(#server_message{},
     #server_message{message = NFmessage}.
 
 -compile({nowarn_unused_function,merge_msg_client_message/3}).
-merge_msg_client_message(#client_message{},
-			 #client_message{username = NFusername,
-					 message_body = NFmessage_body},
+merge_msg_client_message(#client_message{integer_body =
+					     PFinteger_body,
+					 string_body = PFstring_body},
+			 #client_message{type = NFtype, username = NFusername,
+					 integer_body = NFinteger_body,
+					 string_body = NFstring_body},
 			 _) ->
-    #client_message{username = NFusername,
-		    message_body = NFmessage_body}.
+    #client_message{type = NFtype, username = NFusername,
+		    integer_body =
+			if NFinteger_body =:= undefined -> PFinteger_body;
+			   true -> NFinteger_body
+			end,
+		    string_body =
+			if NFstring_body =:= undefined -> PFstring_body;
+			   true -> NFstring_body
+			end}.
 
 -compile({nowarn_unused_function,merge_msg_close_session/3}).
 merge_msg_close_session(#close_session{},
@@ -1417,11 +1525,21 @@ v_msg_server_message(X, Path, _TrUserData) ->
 
 -compile({nowarn_unused_function,v_msg_client_message/3}).
 -dialyzer({nowarn_function,v_msg_client_message/3}).
-v_msg_client_message(#client_message{username = F1,
-				     message_body = F2},
+v_msg_client_message(#client_message{type = F1,
+				     username = F2, integer_body = F3,
+				     string_body = F4},
 		     Path, TrUserData) ->
-    v_type_string(F1, [username | Path], TrUserData),
-    v_type_string(F2, [message_body | Path], TrUserData),
+    'v_enum_client_message.type_enum'(F1, [type | Path],
+				      TrUserData),
+    v_type_string(F2, [username | Path], TrUserData),
+    if F3 == undefined -> ok;
+       true ->
+	   v_type_sint64(F3, [integer_body | Path], TrUserData)
+    end,
+    if F4 == undefined -> ok;
+       true ->
+	   v_type_string(F4, [string_body | Path], TrUserData)
+    end,
     ok;
 v_msg_client_message(X, Path, _TrUserData) ->
     mk_type_error({expected_msg, client_message}, X, Path).
@@ -1474,6 +1592,23 @@ v_msg_envelope(#envelope{uncompressed_data = F1}, Path,
 v_msg_envelope(X, Path, _TrUserData) ->
     mk_type_error({expected_msg, envelope}, X, Path).
 
+-compile({nowarn_unused_function,'v_enum_client_message.type_enum'/3}).
+-dialyzer({nowarn_function,'v_enum_client_message.type_enum'/3}).
+'v_enum_client_message.type_enum'(integer_message,
+				  _Path, _TrUserData) ->
+    ok;
+'v_enum_client_message.type_enum'(string_message, _Path,
+				  _TrUserData) ->
+    ok;
+'v_enum_client_message.type_enum'(V, Path, TrUserData)
+    when is_integer(V) ->
+    v_type_sint32(V, Path, TrUserData);
+'v_enum_client_message.type_enum'(X, Path,
+				  _TrUserData) ->
+    mk_type_error({invalid_enum,
+		   'client_message.type_enum'},
+		  X, Path).
+
 -compile({nowarn_unused_function,'v_enum_req.type_enum'/3}).
 -dialyzer({nowarn_function,'v_enum_req.type_enum'/3}).
 'v_enum_req.type_enum'(create_session, _Path,
@@ -1505,6 +1640,20 @@ v_type_sint32(N, Path, _TrUserData)
 		  N, Path);
 v_type_sint32(X, Path, _TrUserData) ->
     mk_type_error({bad_integer, sint32, signed, 32}, X,
+		  Path).
+
+-compile({nowarn_unused_function,v_type_sint64/3}).
+-dialyzer({nowarn_function,v_type_sint64/3}).
+v_type_sint64(N, _Path, _TrUserData)
+    when -9223372036854775808 =< N,
+	 N =< 9223372036854775807 ->
+    ok;
+v_type_sint64(N, Path, _TrUserData)
+    when is_integer(N) ->
+    mk_type_error({value_out_of_range, sint64, signed, 64},
+		  N, Path);
+v_type_sint64(X, Path, _TrUserData) ->
+    mk_type_error({bad_integer, sint64, signed, 64}, X,
 		  Path).
 
 -compile({nowarn_unused_function,v_type_string/3}).
@@ -1564,7 +1713,9 @@ cons(Elem, Acc, _TrUserData) -> [Elem | Acc].
 
 
 get_msg_defs() ->
-    [{{enum, 'req.type_enum'},
+    [{{enum, 'client_message.type_enum'},
+      [{integer_message, 1}, {string_message, 2}]},
+     {{enum, 'req.type_enum'},
       [{create_session, 1}, {server_message, 2},
        {client_message, 3}, {close_session, 4}]},
      {{msg, create_session},
@@ -1574,10 +1725,15 @@ get_msg_defs() ->
       [#field{name = message, fnum = 1, rnum = 2,
 	      type = string, occurrence = required, opts = []}]},
      {{msg, client_message},
-      [#field{name = username, fnum = 1, rnum = 2,
+      [#field{name = type, fnum = 1, rnum = 2,
+	      type = {enum, 'client_message.type_enum'},
+	      occurrence = required, opts = []},
+       #field{name = username, fnum = 2, rnum = 3,
 	      type = string, occurrence = required, opts = []},
-       #field{name = message_body, fnum = 2, rnum = 3,
-	      type = string, occurrence = required, opts = []}]},
+       #field{name = integer_body, fnum = 3, rnum = 4,
+	      type = sint64, occurrence = optional, opts = []},
+       #field{name = string_body, fnum = 4, rnum = 5,
+	      type = string, occurrence = optional, opts = []}]},
      {{msg, close_session},
       [#field{name = username, fnum = 1, rnum = 2,
 	      type = string, occurrence = required, opts = []}]},
@@ -1615,7 +1771,8 @@ get_msg_or_group_names() ->
      close_session, req, envelope].
 
 
-get_enum_names() -> ['req.type_enum'].
+get_enum_names() ->
+    ['client_message.type_enum', 'req.type_enum'].
 
 
 fetch_msg_def(MsgName) ->
@@ -1639,10 +1796,15 @@ find_msg_def(server_message) ->
     [#field{name = message, fnum = 1, rnum = 2,
 	    type = string, occurrence = required, opts = []}];
 find_msg_def(client_message) ->
-    [#field{name = username, fnum = 1, rnum = 2,
+    [#field{name = type, fnum = 1, rnum = 2,
+	    type = {enum, 'client_message.type_enum'},
+	    occurrence = required, opts = []},
+     #field{name = username, fnum = 2, rnum = 3,
 	    type = string, occurrence = required, opts = []},
-     #field{name = message_body, fnum = 2, rnum = 3,
-	    type = string, occurrence = required, opts = []}];
+     #field{name = integer_body, fnum = 3, rnum = 4,
+	    type = sint64, occurrence = optional, opts = []},
+     #field{name = string_body, fnum = 4, rnum = 5,
+	    type = string, occurrence = optional, opts = []}];
 find_msg_def(close_session) ->
     [#field{name = username, fnum = 1, rnum = 2,
 	    type = string, occurrence = required, opts = []}];
@@ -1668,19 +1830,37 @@ find_msg_def(envelope) ->
 find_msg_def(_) -> error.
 
 
+find_enum_def('client_message.type_enum') ->
+    [{integer_message, 1}, {string_message, 2}];
 find_enum_def('req.type_enum') ->
     [{create_session, 1}, {server_message, 2},
      {client_message, 3}, {close_session, 4}];
 find_enum_def(_) -> error.
 
 
+enum_symbol_by_value('client_message.type_enum',
+		     Value) ->
+    'enum_symbol_by_value_client_message.type_enum'(Value);
 enum_symbol_by_value('req.type_enum', Value) ->
     'enum_symbol_by_value_req.type_enum'(Value).
 
 
+enum_value_by_symbol('client_message.type_enum', Sym) ->
+    'enum_value_by_symbol_client_message.type_enum'(Sym);
 enum_value_by_symbol('req.type_enum', Sym) ->
     'enum_value_by_symbol_req.type_enum'(Sym).
 
+
+'enum_symbol_by_value_client_message.type_enum'(1) ->
+    integer_message;
+'enum_symbol_by_value_client_message.type_enum'(2) ->
+    string_message.
+
+
+'enum_value_by_symbol_client_message.type_enum'(integer_message) ->
+    1;
+'enum_value_by_symbol_client_message.type_enum'(string_message) ->
+    2.
 
 'enum_symbol_by_value_req.type_enum'(1) ->
     create_session;
@@ -1768,11 +1948,15 @@ msg_name_to_fqbin(envelope) -> <<"envelope">>;
 msg_name_to_fqbin(E) -> error({gpb_error, {badmsg, E}}).
 
 
+fqbin_to_enum_name(<<"client_message.type_enum">>) ->
+    'client_message.type_enum';
 fqbin_to_enum_name(<<"req.type_enum">>) -> 'req.type_enum';
 fqbin_to_enum_name(E) ->
     error({gpb_error, {badenum, E}}).
 
 
+enum_name_to_fqbin('client_message.type_enum') ->
+    <<"client_message.type_enum">>;
 enum_name_to_fqbin('req.type_enum') -> <<"req.type_enum">>;
 enum_name_to_fqbin(E) ->
     error({gpb_error, {badenum, E}}).
@@ -1828,7 +2012,7 @@ get_rpc_containment(P) ->
 
 
 get_enum_containment("erl_playground") ->
-    ['req.type_enum'];
+    ['client_message.type_enum', 'req.type_enum'];
 get_enum_containment(P) ->
     error({gpb_error, {badproto, P}}).
 
@@ -1855,6 +2039,8 @@ get_proto_by_service_name_as_fqbin(E) ->
 
 
 get_proto_by_enum_name_as_fqbin(<<"req.type_enum">>) ->
+    "erl_playground";
+get_proto_by_enum_name_as_fqbin(<<"client_message.type_enum">>) ->
     "erl_playground";
 get_proto_by_enum_name_as_fqbin(E) ->
     error({gpb_error, {badenum, E}}).

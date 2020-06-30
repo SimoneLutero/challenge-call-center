@@ -10,7 +10,7 @@
 -export([start_link/0]). -ignore_xref([{start_link, 4}]).
 -export([connect/0, disconnect/0]).
 -export([send_create_session/1, send_close_session/1]).
--export([send_message/2]).
+-export([send_message/3]).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
@@ -64,10 +64,19 @@ send_close_session(Username) ->
     },
     gen_server:cast(whereis(?SERVER), {close_session, CloseSession}).
 
-send_message(Username, Message) ->
+send_message(Username, integer_message, Message) ->
     ClientMessage = #client_message {
+        type = integer_message,
         username = Username,
-        message_body = Message
+        integer_body = Message
+    },
+    gen_server:cast(whereis(?SERVER), {client_message, ClientMessage});
+
+send_message(Username, string_message, Message) ->
+    ClientMessage = #client_message {
+        type = string_message,
+        username = Username,
+        string_body = Message
     },
     gen_server:cast(whereis(?SERVER), {client_message, ClientMessage}).
 

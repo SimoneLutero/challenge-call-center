@@ -24,8 +24,10 @@
 -ifndef('CLIENT_MESSAGE_PB_H').
 -define('CLIENT_MESSAGE_PB_H', true).
 -record(client_message,
-        {username               :: iodata(),        % = 1
-         message_body           :: iodata()         % = 2
+        {type                   :: integer_message | string_message | integer(), % = 1, enum client_message.type_enum
+         username               :: iodata(),        % = 2
+         integer_body           :: integer() | undefined, % = 3, 32 bits
+         string_body            :: iodata() | undefined % = 4
         }).
 -endif.
 

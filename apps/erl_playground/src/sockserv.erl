@@ -206,10 +206,27 @@ process_packet(#req{ type = Type } = Req, State, _Now)
     when Type =:= client_message ->
     #req{
         client_message_data = #client_message {
-            username = UsernameBinary,
-            message_body = MessageBody
+            type = TypeData
         }
     } = Req,
+    case TypeData of
+        integer_message ->
+            #req{
+                client_message_data = #client_message {
+                    type = TypeData,
+                    username = UsernameBinary,
+                    integer_body = MessageBody
+                }
+            } = Req;
+        string_message ->
+            #req{
+                client_message_data = #client_message {
+                    type = TypeData,
+                    username = UsernameBinary,
+                    string_body = MessageBody
+                }
+            } = Req
+    end,
     _ = lager:info("client_message received from ~p", [UsernameBinary]),
 
     UsernameAtom = binary_to_atom(UsernameBinary, utf8), 

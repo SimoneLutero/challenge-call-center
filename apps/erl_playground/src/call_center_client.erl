@@ -1,11 +1,16 @@
 -module(call_center_client).
 
+%% ------------------------------------------------------------------
+%% API Function Exports
+%% ------------------------------------------------------------------
+
 -export([connect/0, disconnect/0]).
 -export([login/1, logout/1]).
 -export([send_message/2]).
 
-%TO DO
-%Move the identification from Username to Socket
+%% ------------------------------------------------------------------
+%% API Function Definition
+%% ------------------------------------------------------------------
 
 connect() ->
     sockclient:connect().
@@ -19,7 +24,12 @@ logout(Username) ->
 disconnect() ->
     sockclient:disconnect().
 
-send_message(Username, Message) ->
-    sockclient:send_message(Username, Message).
+send_message(Username, Message) 
+    when is_integer(Message)->
+        sockclient:send_message(Username, integer_message, Message);
+
+send_message(Username, Message)
+    when is_list(Message) ->
+        sockclient:send_message(Username, string_message, Message).
 
 
