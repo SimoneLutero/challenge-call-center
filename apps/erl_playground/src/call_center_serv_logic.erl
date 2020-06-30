@@ -61,7 +61,7 @@ handle_client(State, PidOperator) ->
     end.
 
 show_menu() ->
-    "Hi! Press 1 to receive the weather forecast~n2 - Press 2 to receive the joke of the day~n3 - Press 3 to request your call ID~n4 - Press 4 to ask for an operator".
+    "Hi! Press 1 to receive the weather forecast 2 - Press 2 to receive the joke of the day 3 - Press 3 to request your call ID 4 - Press 4 to ask for an operator".
 
 get_weather_forecast() ->
     List = ["Sunny","Rainy","Cloudy"],
@@ -69,6 +69,5 @@ get_weather_forecast() ->
 	lists:nth(Index, List).
 
 get_joke_of_the_day() ->
-    List = ["Funny Joke 1","Funny Joke 2","Funny Joke 3"],
-	Index = rand:uniform(length(List)),
-	lists:nth(Index, List).
+    {Setup, Punchline} = joke_of_the_day:get_joke(),
+    list_to_binary(binary_to_list(Setup) ++ " " ++ binary_to_list(Punchline)).
