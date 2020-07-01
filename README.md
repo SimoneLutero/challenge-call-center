@@ -60,6 +60,6 @@ After this, user is ready to interact with the module **call_center_client** and
 
 **sockclient** take the address and the port of the listening host from *sys.config*, then enstabilshes connection with its and send the create_session message enveloped as a google protocol buffers message to the server.
 
-When **sockserv** module receive messages it opens them and process the content; in case of create_session message it spawn a new process which will run the method *handle_client* of **call_center_serv_logic** module, registering its with the Username he received.
+When **sockserv** module receive messages it opens them and process the content; in case of create_session message it spawn a new process which will run the method *handle_client* of **call_center_serv_logic** module, registering its with the *Username* he received.
 
-To be continued..
+Since the process is spawned 
