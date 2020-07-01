@@ -20,8 +20,8 @@ If you are on Mac, we strongly suggest using [kerl](https://github.com/kerl/kerl
 This is a [rebar3](https://www.rebar3.org/) project.
 
 The command used to build the project is `rebar3 compile`.
-
 The command used to run the project is `rebar3 shell`.
+The command used to release the project is `rebar3 release`
 
 ## Compile GPB
 
