@@ -21,19 +21,19 @@
 handle_client(State) ->
     utils:send_response_message(show_menu(), State),
     receive
-        {<<"1">>} ->
+        {1} ->
             utils:send_response_message(get_weather_forecast(), State),
             handle_client(State);
 
-        {<<"2">>} ->
+        {2} ->
             utils:send_response_message(get_joke_of_the_day(), State),
             handle_client(State);
 
-        {<<"3">>} ->
+        {3} ->
             utils:send_response_message(pid_to_list(self()), State),
             handle_client(State);
 
-        {<<"4">>} ->
+        {4} ->
             PidOperator = spawn(?OPERATOR_MODULE, operator, [self(), 0, State]),
             PidOperator ! {welcome},
             handle_client(State, PidOperator);
@@ -61,13 +61,20 @@ handle_client(State, PidOperator) ->
     end.
 
 show_menu() ->
-    "Hi! Press 1 to receive the weather forecast 2 - Press 2 to receive the joke of the day 3 - Press 3 to request your call ID 4 - Press 4 to ask for an operator".
+    "Hi! Send 1 to receive the weather forecast for tomorrow 2 - Send 2 to receive a random joke 3 - Send 3 to request your call ID 4 - Send 4 to ask for an operator".
 
 get_weather_forecast() ->
-    List = ["Sunny","Rainy","Cloudy"],
-	Index = rand:uniform(length(List)),
-	lists:nth(Index, List).
+    case weather_forecast:get_weather() of
+        {Forecast} ->
+            Forecast;
+        {error, _} ->
+            "Error during API call"
+    end.
 
 get_joke_of_the_day() ->
-    {Setup, Punchline} = joke_of_the_day:get_joke(),
-    list_to_binary(binary_to_list(Setup) ++ " " ++ binary_to_list(Punchline)).
+    case joke_of_the_day:get_joke() of
+        {Joke} -> 
+            Joke;
+        {error, _} ->
+            "Error during API call"
+    end.

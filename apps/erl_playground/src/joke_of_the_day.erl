@@ -9,6 +9,8 @@ get_joke() ->
             JsonJoke = jsx:decode(list_to_binary(Body)),
             Setup = maps:get(<<"setup">>, JsonJoke),
             Punchline = maps:get(<<"punchline">>, JsonJoke),
-            {Setup, Punchline};
+            Joke = (binary_to_list(Setup) ++ " " ++ binary_to_list(Punchline)),
+            {Joke};
+        {ok, {{_, Code, _}, _, _}} -> {error, Code};
         {error, Reason} -> {error, Reason}
     end.
