@@ -76,3 +76,7 @@ This operator has a timeout of 10 seconds and a max number of response (3), then
 When the operator is active the *handle_client* process becomes a bridge between **sockserv** and **operator** process, passing client messages from the first one to the second one, until the termination of **operator** process.
 
 When the client decide to disconnect he has to call the *logout/1* method providing his username, or he can close session and connection with the *disconnect/1* method; this will result in a close_session message the will make the *handle_client* process exit and will interrupt the connection to the server.
+
+## Diagram
+
+![Diagram](images/call-center-simulator-schema.jpg)
