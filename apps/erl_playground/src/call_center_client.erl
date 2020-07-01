@@ -4,7 +4,7 @@
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([connect/0, disconnect/0]).
+-export([connect/0, disconnect/1]).
 -export([login/1, logout/1]).
 -export([send_message/2]).
 
@@ -21,7 +21,8 @@ login(Username) ->
 logout(Username) ->
     sockclient:send_close_session(Username).
 
-disconnect() ->
+disconnect(Username) ->
+    sockclient:send_close_session(Username),
     sockclient:disconnect().
 
 send_message(Username, Message) 
@@ -30,6 +31,9 @@ send_message(Username, Message)
 
 send_message(Username, Message)
     when is_list(Message) ->
-        sockclient:send_message(Username, string_message, Message).
+        sockclient:send_message(Username, string_message, Message);
 
+send_message(_, _) ->
+    io:fwrite("Type not handled ~n"),
+    error.
 
