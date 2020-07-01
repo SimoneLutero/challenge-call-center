@@ -80,3 +80,58 @@ When the client decide to disconnect he has to call the *logout/1* method provid
 ## Diagram
 
 ![Diagram](images/call-center-simulator-schema.jpg)
+
+## Example
+
+```
+call_center_client:connect().
+17:46:31.571 [info] sockserv init'ed #Port<0.34>
+ok
+2> call_center_client:login("simone").  
+ok
+3> 17:47:02.208 [info] create_session received from user <<"simone">>
+17:47:02.209 [info] server_message received: <<"session created">>
+17:47:02.211 [info] server_message received: <<"Hi! Send 1 to receive the weather forecast for tomorrow 2 - Send 2 to receive a random joke 3 - Send 3 to request your call ID 4 - Send 4 to ask for an operator">>
+3> call_center_client:send_message("simone",1).
+ok
+17:47:27.631 [info] client_message received from <<"simone">>
+4> 17:47:27.980 [info] server_message received: <<"few clouds">>
+17:47:27.980 [info] server_message received: <<"Hi! Send 1 to receive the weather forecast for tomorrow 2 - Send 2 to receive a random joke 3 - Send 3 to request your call ID 4 - Send 4 to ask for an operator">>
+4> call_center_client:send_message("simone",2).
+ok
+17:47:31.305 [info] client_message received from <<"simone">>
+5> 17:47:31.527 [info] server_message received: <<"What do you call a dad that has fallen through the ice? A Popsicle.">>
+17:47:31.527 [info] server_message received: <<"Hi! Send 1 to receive the weather forecast for tomorrow 2 - Send 2 to receive a random joke 3 - Send 3 to request your call ID 4 - Send 4 to ask for an operator">>
+5> call_center_client:send_message("simone",3).
+17:47:41.297 [info] client_message received from <<"simone">>
+ok
+17:47:41.297 [info] server_message received: <<"<0.384.0>">>
+17:47:41.297 [info] server_message received: <<"Hi! Send 1 to receive the weather forecast for tomorrow 2 - Send 2 to receive a random joke 3 - Send 3 to request your call ID 4 - Send 4 to ask for an operator">>
+6> call_center_client:send_message("simone",4).
+ok
+17:47:50.493 [info] client_message received from <<"simone">>
+7> 17:47:50.495 [info] server_message received: <<"Hi, I'm the operator <0.390.0>, how can I help you?">>
+7> call_center_client:send_message("simone",4).
+ok
+17:47:52.749 [info] client_message received from <<"simone">>
+17:47:52.750 [info] server_message received: <<"The number is even">>
+8> call_center_client:send_message("simone","ciao").
+17:47:57.042 [info] client_message received from <<"simone">>
+ok
+17:47:57.042 [info] server_message received: <<"This process Pid is <0.390.0>">>
+9> call_center_client:send_message("simone",2).     
+17:48:02.781 [info] client_message received from <<"simone">>
+ok
+17:48:02.782 [info] server_message received: <<"The number is even">>
+10> 17:48:02.782 [info] server_message received: <<"Max number of questions reached, see you soon">>
+17:48:02.782 [info] server_message received: <<"Conversation with operator is terminated">>
+17:48:02.782 [info] server_message received: <<"Hi! Send 1 to receive the weather forecast for tomorrow 2 - Send 2 to receive a random joke 3 - Send 3 to request your call ID 4 - Send 4 to ask for an operator">>
+10> call_center_client:logout("simone").             
+ok
+17:48:22.354 [info] close_session received from <<"simone">>
+11> 17:48:22.354 [info] server_message received: <<"session closed">>
+11> call_center_client:disconnect().                 
+** exception error: undefined function call_center_client:disconnect/0
+12> 
+```
+

@@ -34,7 +34,7 @@ handle_client(State) ->
             handle_client(State);
 
         {4} ->
-            PidOperator = spawn(?OPERATOR_MODULE, operator, [self(), 0, State]),
+            PidOperator = spawn(?OPERATOR_MODULE, operator, [self(), State]),
             PidOperator ! {welcome},
             handle_client(State, PidOperator);
 
