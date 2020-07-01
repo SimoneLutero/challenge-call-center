@@ -53,8 +53,8 @@ operator(FatherPid, Count, TimeToLeave, MaxMessageNumber, State)
 
 operator(FatherPid, Count, _, MaxMessageNumber, State)
     when Count > MaxMessageNumber ->
-    utils:send_response_message("Max number of questions reached, see you soon", State),
-    FatherPid ! {self(), terminated},
-    exit(normal).
+        utils:send_response_message("Max number of questions reached, see you soon", State),
+        FatherPid ! {self(), terminated},
+        exit(normal).
             
 even(X) when X >= 0 -> (X band 1) == 0.
