@@ -44,7 +44,7 @@ You can use this application to simulate a call to a call center, which provide 
 
 The **call_center_client** module provide a few simple functions with wich the user can interact with the server, connecting and disconnecting to it and sending messages.
 
-## How it works?
+## How it works
 The **erl_playground** application starts a supervisor which handles two processes that run **node_boot** and **ranch_sup**.
 
 **ranch_sup** must be started to make ranch listeners available.
@@ -55,7 +55,7 @@ The **node_boot** module reads from *sys.config* the environment variable *boot_
 * only_server: only the server will be started.
 * only_client: only the client will be started.
 
-After this, user is ready to interact with the module **call_center_client** and the firt things he has to do are to create a connection using function *connect/0* and initiate a call providing his username with the method *login/1*.
+After this, user is ready to interact with the module **call_center_client** and the first things he has to do are to create a connection using function *connect/0* and initiate a call providing his username with the method *login/1*.
 
 **sockclient** take the address and the port of the listening host from *sys.config*, then enstabilshes connection with it and send the create_session message enveloped as a google protocol buffers message to the server.
 
